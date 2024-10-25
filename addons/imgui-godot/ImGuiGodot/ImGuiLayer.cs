@@ -1,5 +1,4 @@
 using Godot;
-#if GODOT_PC
 #nullable enable
 
 namespace ImGuiGodot;
@@ -105,12 +104,3 @@ public partial class ImGuiLayer : CanvasLayer
         return svp;
     }
 }
-#else
-namespace ImGuiNET
-{
-}
-
-namespace ImGuiGodot
-{
-}
-#endif

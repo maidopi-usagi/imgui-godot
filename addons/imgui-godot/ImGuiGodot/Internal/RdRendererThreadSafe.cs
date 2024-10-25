@@ -1,7 +1,6 @@
-#if GODOT_PC
 #nullable enable
 using Godot;
-using ImGuiNET;
+using Hexa.NET.ImGui;
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
@@ -23,22 +22,25 @@ internal sealed class ClonedDrawData : IDisposable
         long ddsize = Marshal.SizeOf<ImDrawData>();
 
         // start with a shallow copy
-        Data = new(ImGui.MemAlloc((uint)ddsize));
-        Buffer.MemoryCopy(inp.NativePtr, Data.NativePtr, ddsize, ddsize);
+        Data = new((ImDrawData*)ImGui.MemAlloc((uint)ddsize));
+        Buffer.MemoryCopy(inp, Data, ddsize, ddsize);
 
         // clone the draw data
         int numLists = inp.CmdLists.Size;
-        IntPtr cmdListPtrs = ImGui.MemAlloc((uint)(Marshal.SizeOf<IntPtr>() * numLists));
-        Data.NativePtr->CmdLists = new ImVector(numLists, numLists, cmdListPtrs);
+        var cmdListPtrs = ImGui.MemAlloc((uint)(Marshal.SizeOf<IntPtr>() * numLists));
+        Data.CmdLists = new ImVector<ImDrawListPtr>(
+            numLists,
+            numLists,
+            (ImDrawListPtr*)cmdListPtrs);
         for (int i = 0; i < inp.CmdLists.Size; ++i)
         {
-            Data.CmdLists[i] = (IntPtr)inp.CmdLists[i].CloneOutput().NativePtr;
+            Data.CmdLists[i] = inp.CmdLists[i].CloneOutput();
         }
     }
 
     public unsafe void Dispose()
     {
-        if (Data.NativePtr == null)
+        if (Data.IsNull)
             return;
 
         for (int i = 0; i < Data.CmdListsCount; ++i)
@@ -70,7 +72,7 @@ internal sealed class RdRendererThreadSafe : RdRenderer, IRenderer
     public new string Name => "godot4_net_rd_mt";
 
 #if GODOT4_3_OR_GREATER
-    public new void Render()
+    public new unsafe void Render()
     {
         var pio = ImGui.GetPlatformIO();
         var newData = new SharedList(pio.Viewports.Size);
@@ -159,4 +161,3 @@ internal sealed class RdRendererThreadSafe : RdRenderer, IRenderer
     }
 #endif
 }
-#endif

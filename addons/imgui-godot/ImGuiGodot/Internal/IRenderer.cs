@@ -1,4 +1,3 @@
-#if GODOT_PC
 using Godot;
 using System;
 
@@ -12,4 +11,3 @@ internal interface IRenderer : IDisposable
     public void Render();
     public void OnHide();
 }
-#endif

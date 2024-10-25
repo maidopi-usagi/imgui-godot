@@ -1,4 +1,3 @@
-#if GODOT_PC
 #nullable enable
 using Godot;
 using System;
@@ -130,4 +129,3 @@ public static partial class ImGuiGD
         _backend.SetIniFilename(filename);
     }
 }
-#endif

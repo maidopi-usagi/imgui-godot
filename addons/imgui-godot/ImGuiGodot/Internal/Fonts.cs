@@ -1,7 +1,6 @@
-#if GODOT_PC
 #nullable enable
 using Godot;
-using ImGuiNET;
+using Hexa.NET.ImGui;
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
@@ -30,7 +29,7 @@ internal sealed class Fonts
     {
         var io = ImGui.GetIO();
         io.Fonts.Clear();
-        unsafe { io.NativePtr->FontDefault = null; }
+        unsafe { io.FontDefault = null; }
         _fontConfiguration.Clear();
     }
 
@@ -50,7 +49,7 @@ internal sealed class Fonts
     {
         var io = ImGui.GetIO();
         int fontSize = (int)(fp.FontSize * scale);
-        ImFontConfig* fc = ImGuiNative.ImFontConfig_ImFontConfig();
+        ImFontConfig* fc = ImGui.ImFontConfig();
 
         if (fp.Merge)
         {
@@ -74,23 +73,28 @@ internal sealed class Fonts
             string name = $"{System.IO.Path.GetFileName(fp.Font.ResourcePath)}, {fontSize}px";
             for (int i = 0; i < name.Length && i < 40; ++i)
             {
-                fc->Name[i] = Convert.ToByte(name[i]);
+                ImGuiExtensions.SetFontConfigName(fc, i, Convert.ToByte(name[i]));
             }
 
             int len = fp.Font.Data.Length;
             // let ImGui manage this memory
-            IntPtr p = ImGui.MemAlloc((uint)len);
+            IntPtr p = (IntPtr)ImGui.MemAlloc((uint)len);
             Marshal.Copy(fp.Font.Data, 0, p, len);
             if (fp.Ranges == null)
             {
-                ImVector ranges = GetRanges(fp.Font);
-                io.Fonts.AddFontFromMemoryTTF(p, len, fontSize, fc, ranges.Data);
+                io.Fonts.AddFontFromMemoryTTF(
+                    p.ToPointer(),
+                    len,
+                    fontSize,
+                    fc,
+                    io.Fonts.GetGlyphRangesChineseFull());
             }
             else
             {
                 fixed (ushort* pranges = fp.Ranges)
                 {
-                    io.Fonts.AddFontFromMemoryTTF(p, len, fontSize, fc, (nint)pranges);
+                    io.Fonts.AddFontFromMemoryTTF(p.ToPointer(), len, fontSize, fc,
+                        (char*)((nint)pranges).ToPointer());
                 }
             }
         }
@@ -98,22 +102,12 @@ internal sealed class Fonts
         if (fp.Merge)
             io.Fonts.Build();
 
-        ImGuiNative.ImFontConfig_destroy(fc);
-    }
-
-    private static unsafe ImVector GetRanges(Font font)
-    {
-        var builder = new ImFontGlyphRangesBuilderPtr(
-            ImGuiNative.ImFontGlyphRangesBuilder_ImFontGlyphRangesBuilder());
-        builder.AddText(font.GetSupportedChars());
-        builder.BuildRanges(out ImVector vec);
-        builder.Destroy();
-        return vec;
+        ImGui.Destroy(fc);
     }
 
     private static unsafe void ResetStyle()
     {
-        ImGuiStylePtr defaultStyle = new(ImGuiNative.ImGuiStyle_ImGuiStyle());
+        ImGuiStylePtr defaultStyle = new(ImGui.ImGuiStyle());
         ImGuiStylePtr style = ImGui.GetStyle();
 
         style.WindowPadding = defaultStyle.WindowPadding;
@@ -151,17 +145,17 @@ internal sealed class Fonts
         int fontIndex = -1;
 
         // save current font index
-        if (io.NativePtr->FontDefault != null)
+        if (!io.FontDefault.IsNull)
         {
             for (int i = 0; i < io.Fonts.Fonts.Size; ++i)
             {
-                if (io.Fonts.Fonts[i].NativePtr == io.FontDefault.NativePtr)
+                if (io.Fonts.Fonts[i] == io.FontDefault)
                 {
                     fontIndex = i;
                     break;
                 }
             }
-            io.NativePtr->FontDefault = null;
+            io.FontDefault = null;
         }
         io.Fonts.Clear();
 
@@ -170,11 +164,11 @@ internal sealed class Fonts
             AddFontToAtlas(fontParams, scale);
         }
 
-        io.Fonts.GetTexDataAsRGBA32(
-            out byte* pixelData,
-            out int width,
-            out int height,
-            out int bytesPerPixel);
+        byte* pixelData = default;
+        int width = 0; int height = 0;
+        int bytesPerPixel = 0;
+        io.Fonts.GetTexDataAsRGBA32(ref pixelData, ref width, ref height, ref bytesPerPixel);
+        // io.Fonts.GetTexDataAsRGBA32(out byte* pixelData, out int width, out int height, out int bytesPerPixel);
 
         byte[] pixels = new byte[width * height * bytesPerPixel];
         Marshal.Copy((IntPtr)pixelData, pixels, 0, pixels.Length);
@@ -182,17 +176,16 @@ internal sealed class Fonts
         var img = Image.CreateFromData(width, height, false, Image.Format.Rgba8, pixels);
 
         _fontTexture = ImageTexture.CreateFromImage(img);
-        io.Fonts.SetTexID((IntPtr)_fontTexture.GetRid().Id);
+        io.Fonts.SetTexID(_fontTexture.GetRid().Id);
         io.Fonts.ClearTexData();
 
         // maintain selected font when rescaling
         if (fontIndex != -1 && fontIndex < io.Fonts.Fonts.Size)
         {
-            io.NativePtr->FontDefault = io.Fonts.Fonts[fontIndex].NativePtr;
+            io.FontDefault = io.Fonts.Fonts[fontIndex];
         }
 
         ResetStyle();
         ImGui.GetStyle().ScaleAllSizes(scale);
     }
 }
-#endif

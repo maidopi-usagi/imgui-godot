@@ -1,7 +1,6 @@
-#if GODOT_PC
 #nullable enable
 using Godot;
-using ImGuiNET;
+using Hexa.NET.ImGui;
 using System;
 using Vector2 = System.Numerics.Vector2;
 
@@ -67,14 +66,14 @@ internal sealed class BackendNet : IBackend
         ImGuiController.Instance.SetMainViewport(vp);
     }
 
-    public bool SubViewportWidget(SubViewport svp)
+    public unsafe bool SubViewportWidget(SubViewport svp)
     {
         Vector2 vpSize = new(svp.Size.X, svp.Size.Y);
         var pos = ImGui.GetCursorScreenPos();
         var pos_max = new Vector2(pos.X + vpSize.X, pos.Y + vpSize.Y);
-        ImGui.GetWindowDrawList().AddImage((IntPtr)svp.GetTexture().GetRid().Id, pos, pos_max);
+        ImGui.GetWindowDrawList().AddImage(svp.GetTexture().GetRid().Id, pos, pos_max);
 
-        ImGui.PushID(svp.NativeInstance);
+        ImGui.PushID(svp.NativeInstance.ToPointer());
         ImGui.InvisibleButton("godot_subviewport", vpSize);
         ImGui.PopID();
 
@@ -87,4 +86,3 @@ internal sealed class BackendNet : IBackend
         return false;
     }
 }
-#endif

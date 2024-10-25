@@ -8,11 +8,15 @@
 
 config_version=5
 
+[addons]
+
+imgui/config="res://imgui_cfg.tres"
+
 [application]
 
 config/name="Dear ImGui for Godot Demo"
 run/main_scene="res://data/demo.tscn"
-config/features=PackedStringArray("4.3", "C#")
+config/features=PackedStringArray("4.4", "C#")
 run/max_fps=60
 config/icon="res://data/icon.svg"
 

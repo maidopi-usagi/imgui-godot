@@ -1,6 +1,5 @@
-#if GODOT_PC
 using Godot;
-using ImGuiNET;
+using Hexa.NET.ImGui;
 using System;
 using System.Buffers;
 using System.Collections.Generic;
@@ -171,7 +170,7 @@ internal class RdRenderer : IRenderer
     {
     }
 
-    private void SetupBuffers(ImDrawDataPtr drawData)
+    private unsafe void SetupBuffers(ImDrawDataPtr drawData)
     {
         int vertSize = Marshal.SizeOf<ImDrawVert>();
         int globalIdxOffset = 0;
@@ -188,21 +187,20 @@ internal class RdRenderer : IRenderer
             ImDrawListPtr cmdList = drawData.CmdLists[i];
 
             int vertBytes = cmdList.VtxBuffer.Size * vertSize;
-            Marshal.Copy(cmdList.VtxBuffer.Data, vertBuf, globalVtxOffset, vertBytes);
+            Marshal.Copy((IntPtr)cmdList.VtxBuffer.Data, vertBuf, globalVtxOffset, vertBytes);
             globalVtxOffset += vertBytes;
 
             int idxBytes = cmdList.IdxBuffer.Size * sizeof(ushort);
-            Marshal.Copy(cmdList.IdxBuffer.Data, idxBuf, globalIdxOffset, idxBytes);
+            Marshal.Copy((IntPtr)cmdList.IdxBuffer.Data, idxBuf, globalIdxOffset, idxBytes);
             globalIdxOffset += idxBytes;
 
             // create a uniform set for each texture
             for (int cmdi = 0; cmdi < cmdList.CmdBuffer.Size; ++cmdi)
             {
-                ImDrawCmdPtr drawCmd = cmdList.CmdBuffer[cmdi];
-                IntPtr texid = drawCmd.GetTexID();
-                if (texid == IntPtr.Zero)
-                    continue;
-                Rid texrid = Util.ConstructRid((ulong)texid);
+                var drawCmd = cmdList.CmdBuffer[cmdi];
+                var imTextureId = drawCmd.TextureId;
+                Rid texrid = Util.ConstructRid((ulong)imTextureId.Handle);
+                IntPtr texid = (nint)imTextureId.Handle;
                 if (!RD.TextureIsValid(texrid))
                     continue;
 
@@ -234,9 +232,9 @@ internal class RdRenderer : IRenderer
             ImDrawListPtr cmdList = drawData.CmdLists[i];
             for (int cmdi = 0; cmdi < cmdList.CmdBuffer.Size; ++cmdi)
             {
-                ImDrawCmdPtr drawCmd = cmdList.CmdBuffer[cmdi];
-                drawCmd.TextureId = (IntPtr)RenderingServer.TextureGetRdTexture(
-                    Util.ConstructRid((ulong)drawCmd.TextureId)).Id;
+                var drawCmd = cmdList.CmdBuffer[cmdi];
+                drawCmd.TextureId = RenderingServer.TextureGetRdTexture(Util.ConstructRid((ulong)drawCmd.TextureId.Handle)).Id;
+                cmdList.CmdBuffer[cmdi] = drawCmd;
             }
         }
     }
@@ -255,7 +253,7 @@ internal class RdRenderer : IRenderer
         _usedTextures.Clear();
     }
 
-    public void Render()
+    public unsafe void Render()
     {
         var pio = ImGui.GetPlatformIO();
         for (int i = 0; i < pio.Viewports.Size; ++i)
@@ -343,10 +341,10 @@ internal class RdRenderer : IRenderer
 
             for (int cmdi = 0; cmdi < cmdList.CmdBuffer.Size; ++cmdi)
             {
-                ImDrawCmdPtr drawCmd = cmdList.CmdBuffer[cmdi];
+                var drawCmd = cmdList.CmdBuffer[cmdi];
                 if (drawCmd.ElemCount == 0)
                     continue;
-                if (!_uniformSets.ContainsKey(drawCmd.GetTexID()))
+                if (!_uniformSets.ContainsKey((nint)drawCmd.GetTexID().Handle))
                     continue;
 
                 Rid idxArray = RD.IndexArrayCreate(_idxBuffer,
@@ -362,7 +360,7 @@ internal class RdRenderer : IRenderer
                     _srcBuffers,
                     _vtxOffsets);
 
-                RD.DrawListBindUniformSet(dl, _uniformSets[drawCmd.GetTexID()], 0);
+                RD.DrawListBindUniformSet(dl, _uniformSets[(nint)drawCmd.GetTexID().Handle], 0);
                 RD.DrawListBindIndexArray(dl, idxArray);
                 RD.DrawListBindVertexArray(dl, vtxArray);
 
@@ -419,4 +417,3 @@ internal class RdRenderer : IRenderer
         return fb;
     }
 }
-#endif

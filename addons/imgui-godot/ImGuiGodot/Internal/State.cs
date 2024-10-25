@@ -1,11 +1,15 @@
-#if GODOT_PC
 using Godot;
-using ImGuiNET;
+using Hexa.NET.ImGui;
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
+using Hexa.NET.ImGuizmo;
+using Hexa.NET.ImNodes;
+using Hexa.NET.ImPlot;
 
 namespace ImGuiGodot.Internal;
 
+[SuppressMessage("Roslynator", "RCS0056:A line is too long")]
 internal sealed class State : IDisposable
 {
     private enum RendererType
@@ -54,13 +58,19 @@ internal sealed class State : IDisposable
         Input = new Input();
         Fonts = new Fonts();
 
-        if (ImGui.GetCurrentContext() != IntPtr.Zero)
+        if (!ImGui.GetCurrentContext().IsNull)
         {
             ImGui.DestroyContext();
         }
 
         var context = ImGui.CreateContext();
         ImGui.SetCurrentContext(context);
+        ImPlot.CreateContext();
+        ImPlot.SetImGuiContext(context);
+        ImNodes.CreateContext();
+        ImNodes.SetImGuiContext(context);
+        ImGuizmo.InitApi();
+        ImGuizmo.SetImGuiContext(context);
 
         var io = ImGui.GetIO();
         io.BackendFlags =
@@ -77,13 +87,14 @@ internal sealed class State : IDisposable
 
         unsafe
         {
-            io.NativePtr->BackendPlatformName = (byte*)_backendName;
-            io.NativePtr->BackendRendererName = (byte*)_rendererName;
-            io.NativePtr->PlatformSetImeDataFn = Marshal.GetFunctionPointerForDelegate(_setImeData);
-            io.NativePtr->SetClipboardTextFn = Marshal.GetFunctionPointerForDelegate(
-                _setClipboardText);
-            io.NativePtr->GetClipboardTextFn = Marshal.GetFunctionPointerForDelegate(
-                _getClipboardText);
+            io.BackendPlatformName = (byte*)_backendName;
+            io.BackendRendererName = (byte*)_rendererName;
+            var platformIo = ImGui.GetPlatformIO();
+            platformIo.PlatformSetImeDataFn = Marshal.GetFunctionPointerForDelegate(_setImeData).ToPointer();
+            platformIo.PlatformSetClipboardTextFn = Marshal.GetFunctionPointerForDelegate(
+                _setClipboardText).ToPointer();
+            platformIo.PlatformGetClipboardTextFn = Marshal.GetFunctionPointerForDelegate(
+                _getClipboardText).ToPointer();
         }
 
         Viewports = new Viewports();
@@ -91,8 +102,12 @@ internal sealed class State : IDisposable
 
     public void Dispose()
     {
-        if (ImGui.GetCurrentContext() != IntPtr.Zero)
+        if (!ImGui.GetCurrentContext().IsNull)
+        {
+            ImNodes.DestroyContext();
+            ImPlot.DestroyContext();
             ImGui.DestroyContext();
+        }
         Renderer.Dispose();
     }
 
@@ -172,7 +187,7 @@ internal sealed class State : IDisposable
     public unsafe void SetIniFilename(string fileName)
     {
         var io = ImGui.GetIO();
-        io.NativePtr->IniFilename = null;
+        io.IniFilename = null;
 
         if (_iniFilenameBuffer != IntPtr.Zero)
         {
@@ -184,7 +199,7 @@ internal sealed class State : IDisposable
         {
             fileName = ProjectSettings.GlobalizePath(fileName);
             _iniFilenameBuffer = Marshal.StringToCoTaskMemUTF8(fileName);
-            io.NativePtr->IniFilename = (byte*)_iniFilenameBuffer;
+            io.IniFilename = (byte*)_iniFilenameBuffer;
         }
     }
 
@@ -206,7 +221,10 @@ internal sealed class State : IDisposable
         Renderer.Render();
     }
 
-    private static void SetImeData(nint ctx, ImGuiViewportPtr vp, ImGuiPlatformImeDataPtr data)
+    private static unsafe void SetImeData(
+        nint ctx,
+        ImGuiViewportPtr vp,
+        ImGuiPlatformImeDataPtr data)
     {
         int windowID = (int)vp.PlatformHandle;
 
@@ -234,4 +252,3 @@ internal sealed class State : IDisposable
         return _clipBuf;
     }
 }
-#endif

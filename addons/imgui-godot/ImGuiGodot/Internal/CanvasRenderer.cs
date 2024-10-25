@@ -1,6 +1,5 @@
-#if GODOT_PC
 using Godot;
-using ImGuiNET;
+using Hexa.NET.ImGui;
 using System;
 using System.Collections.Generic;
 
@@ -33,7 +32,7 @@ internal sealed class CanvasRenderer : IRenderer
         };
     }
 
-    public void Render()
+    public unsafe void Render()
     {
         var pio = ImGui.GetPlatformIO();
         for (int vpidx = 0; vpidx < pio.Viewports.Size; vpidx++)
@@ -101,9 +100,9 @@ internal sealed class CanvasRenderer : IRenderer
             for (int i = 0; i < cmdList.VtxBuffer.Size; ++i)
             {
                 var v = cmdList.VtxBuffer[i];
-                vertices[i] = new(v.pos.X, v.pos.Y);
+                vertices[i] = new(v.Pos.X, v.Pos.Y);
                 // need to reverse the color bytes
-                uint rgba = v.col;
+                uint rgba = v.Col;
                 float r = (rgba & 0xFFu) / 255f;
                 rgba >>= 8;
                 float g = (rgba & 0xFFu) / 255f;
@@ -112,12 +111,12 @@ internal sealed class CanvasRenderer : IRenderer
                 rgba >>= 8;
                 float a = (rgba & 0xFFu) / 255f;
                 colors[i] = new(r, g, b, a);
-                uvs[i] = new(v.uv.X, v.uv.Y);
+                uvs[i] = new(v.Uv.X, v.Uv.Y);
             }
 
             for (int cmdi = 0; cmdi < cmdList.CmdBuffer.Size; ++cmdi)
             {
-                ImDrawCmdPtr drawCmd = cmdList.CmdBuffer[cmdi];
+                var drawCmd = cmdList.CmdBuffer[cmdi];
 
                 if (drawCmd.ElemCount == 0)
                 {
@@ -149,7 +148,7 @@ internal sealed class CanvasRenderer : IRenderer
 
                 Rid child = children[nodeN++];
 
-                Rid texrid = Util.ConstructRid((ulong)drawCmd.GetTexID());
+                Rid texrid = Util.ConstructRid((ulong)drawCmd.GetTexID().Handle);
                 RenderingServer.CanvasItemClear(child);
                 Transform2D xform = Transform2D.Identity;
                 if (drawData.DisplayPos != System.Numerics.Vector2.Zero)
@@ -219,4 +218,3 @@ internal sealed class CanvasRenderer : IRenderer
         _canvasItemPools.Clear();
     }
 }
-#endif

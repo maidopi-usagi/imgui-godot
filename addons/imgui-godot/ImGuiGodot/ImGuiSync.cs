@@ -1,6 +1,5 @@
 using Godot;
-#if GODOT_PC
-using ImGuiNET;
+using Hexa.NET.ImGui;
 using System.Runtime.InteropServices;
 using System;
 
@@ -10,11 +9,11 @@ public partial class ImGuiSync : GodotObject
 {
     public static readonly StringName GetImGuiPtrs = "GetImGuiPtrs";
 
-    public static void SyncPtrs()
+    public static unsafe void SyncPtrs()
     {
         GodotObject gd = Engine.GetSingleton("ImGuiGD");
         long[] ptrs = (long[])gd.Call(GetImGuiPtrs,
-            ImGui.GetVersion(),
+            (IntPtr)ImGui.GetVersion(),
             Marshal.SizeOf<ImGuiIO>(),
             Marshal.SizeOf<ImDrawVert>(),
             sizeof(ushort),
@@ -28,9 +27,10 @@ public partial class ImGuiSync : GodotObject
 
         checked
         {
-            ImGui.SetCurrentContext((IntPtr)ptrs[0]);
-            ImGui.SetAllocatorFunctions((IntPtr)ptrs[1], (IntPtr)ptrs[2]);
+            var allocFunc = Marshal.GetDelegateForFunctionPointer<ImGuiMemAllocFunc>((nint)ptrs[1]);
+            var freeFunc = Marshal.GetDelegateForFunctionPointer<ImGuiMemFreeFunc>((nint)ptrs[2]);
+            ImGui.SetCurrentContext(new ImGuiContextPtr{Handle = (ImGuiContext*)ptrs[0]});
+            ImGui.SetAllocatorFunctions(allocFunc, freeFunc);
         }
     }
 }
-#endif

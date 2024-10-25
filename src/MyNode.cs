@@ -1,6 +1,9 @@
 using Godot;
 using ImGuiGodot;
-using ImGuiNET;
+using Hexa.NET.ImGui;
+using Hexa.NET.ImGuizmo;
+using Hexa.NET.ImNodes;
+using Hexa.NET.ImPlot;
 
 namespace DemoProject;
 
@@ -29,9 +32,21 @@ public partial class MyNode : Node
 
     public override void _Process(double delta)
     {
-#if GODOT_PC
         ImGui.ShowDemoWindow();
-#endif
+        ImPlot.ShowDemoWindow();
+        ImGui.Begin("ImNodes");
+        ImNodes.BeginNodeEditor();
+        ImNodes.MiniMap();
+        ImNodes.BeginNode(5);
+        ImNodes.BeginNodeTitleBar();
+        ImGui.TextUnformatted("Hello Node!");
+        ImNodes.EndNodeTitleBar();
+        ImNodes.BeginOutputAttribute(1);
+        ImGui.Text("Out");
+        ImNodes.EndOutputAttribute();
+        ImNodes.EndNode();
+        ImNodes.EndNodeEditor();
+        ImGui.End();
     }
 
     private void OnButton1Pressed()

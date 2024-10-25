@@ -1,12 +1,12 @@
+using System;
 using Godot;
 using ImGuiGodot;
-using ImGuiNET;
+using Hexa.NET.ImGui;
 
 namespace DemoProject;
 
 public partial class MySecondNode : Node
 {
-#if GODOT_PC
     private Texture2D _iconTexture = null!;
     private AtlasTexture _atlasTexture = null!;
     private SubViewport _vp = null!;
@@ -32,7 +32,7 @@ public partial class MySecondNode : Node
         $"Godot {Engine.GetVersionInfo()["string"].AsString()} with .NET " +
         $"{System.Environment.Version}";
 
-    public override void _EnterTree()
+    public override unsafe void _EnterTree()
     {
         if (!_fontLoaded)
         {
@@ -45,7 +45,7 @@ public partial class MySecondNode : Node
             ImGuiGD.AddFont(GD.Load<FontFile>("res://data/Hack-Regular.ttf"), 18);
             ImGuiGD.AddFont(GD.Load<FontFile>("res://data/MPLUS2-Regular.ttf"), 24,
                 merge: true,
-                glyphRanges: ImGui.GetIO().Fonts.GetGlyphRangesJapanese());
+                glyphRanges: (IntPtr)ImGui.GetIO().Fonts.GetGlyphRangesJapanese());
 
             ImGuiGD.AddFontDefault();
             ImGuiGD.RebuildFontAtlas();
@@ -69,7 +69,7 @@ public partial class MySecondNode : Node
 
         unsafe
         {
-            _wcTopMost = ImGuiNative.ImGuiWindowClass_ImGuiWindowClass();
+            _wcTopMost = ImGui.ImGuiWindowClass();
             _wcTopMost.ViewportFlagsOverrideSet = ImGuiViewportFlags.TopMost
                 | ImGuiViewportFlags.NoAutoMerge;
         }
@@ -184,5 +184,4 @@ public partial class MySecondNode : Node
         // old font pointers are invalid after changing scale
         _proggy = ImGui.GetIO().Fonts.Fonts[1];
     }
-#endif
 }

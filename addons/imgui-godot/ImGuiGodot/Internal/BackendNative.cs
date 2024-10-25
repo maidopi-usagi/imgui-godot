@@ -1,4 +1,3 @@
-#if GODOT_PC
 #nullable enable
 using Godot;
 
@@ -101,4 +100,3 @@ internal sealed class BackendNative : IBackend
         _gd.Call(MethodName.SetIniFilename, filename);
     }
 }
-#endif

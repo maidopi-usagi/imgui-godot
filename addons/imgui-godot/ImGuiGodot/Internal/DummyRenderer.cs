@@ -1,4 +1,3 @@
-#if GODOT_PC
 using Godot;
 
 namespace ImGuiGodot.Internal;
@@ -27,4 +26,3 @@ internal sealed class DummyRenderer : IRenderer
     {
     }
 }
-#endif

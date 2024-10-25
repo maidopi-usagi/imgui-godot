@@ -1,7 +1,6 @@
-#if GODOT_PC
 #nullable enable
 using Godot;
-using ImGuiNET;
+using Hexa.NET.ImGui;
 
 namespace ImGuiGodot;
 
@@ -148,4 +147,3 @@ public partial class ImGuiController : Node
         Internal.State.Instance.Input.ProcessInput(evt);
     }
 }
-#endif

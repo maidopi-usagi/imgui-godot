@@ -1,6 +1,5 @@
-#if GODOT_PC
 using Godot;
-using ImGuiNET;
+using Hexa.NET.ImGui;
 
 namespace ImGuiGodot.Internal;
 
@@ -19,13 +18,10 @@ internal sealed class InputLocal : Input
         {
             var io = ImGui.GetIO();
             var mousePos = mm.Position;
-#pragma warning disable IDE0004 // Remove Unnecessary Cast
-            io.AddMousePosEvent((float)mousePos.X, (float)mousePos.Y);
-#pragma warning restore IDE0004 // Remove Unnecessary Cast
+            io.AddMousePosEvent(mousePos.X, mousePos.Y);
             mm.Dispose();
             return io.WantCaptureMouse;
         }
         return HandleEvent(evt);
     }
 }
-#endif

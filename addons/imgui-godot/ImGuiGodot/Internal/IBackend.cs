@@ -1,4 +1,3 @@
-#if GODOT_PC
 #nullable enable
 using Godot;
 
@@ -18,4 +17,3 @@ internal interface IBackend
     public bool SubViewportWidget(SubViewport svp);
     public void SetIniFilename(string filename);
 }
-#endif

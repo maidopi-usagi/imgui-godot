@@ -1,13 +1,13 @@
-#if GODOT_PC
 using Godot;
-using ImGuiNET;
+using Hexa.NET.ImGui;
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 using Vector2 = System.Numerics.Vector2;
 
 namespace ImGuiGodot.Internal;
 
-internal sealed class GodotImGuiWindow : IDisposable
+internal sealed unsafe class GodotImGuiWindow : IDisposable
 {
     private readonly GCHandle _gcHandle;
     private readonly ImGuiViewportPtr _vp;
@@ -21,7 +21,7 @@ internal sealed class GodotImGuiWindow : IDisposable
     {
         _gcHandle = GCHandle.Alloc(this);
         _vp = vp;
-        _vp.PlatformUserData = (IntPtr)_gcHandle;
+        _vp.PlatformUserData = ((IntPtr)_gcHandle).ToPointer();
         _isOwnedWindow = true;
 
         Rect2I winRect = new(_vp.Pos.ToVector2I(), _vp.Size.ToVector2I());
@@ -59,8 +59,8 @@ internal sealed class GodotImGuiWindow : IDisposable
 
         // it's our window, so just draw directly to the root viewport
         var vprid = _window.GetViewportRid();
-        _vp.RendererUserData = (IntPtr)vprid.Id;
-        _vp.PlatformHandle = _window.GetWindowId();
+        _vp.RendererUserData = ((IntPtr)vprid.Id).ToPointer();
+        _vp.PlatformHandle = ((IntPtr)_window.GetWindowId()).ToPointer();
 
         State.Instance.Renderer.InitViewport(vprid);
         RenderingServer.ViewportSetTransparentBackground(_window.GetViewportRid(), true);
@@ -73,9 +73,9 @@ internal sealed class GodotImGuiWindow : IDisposable
     {
         _gcHandle = GCHandle.Alloc(this);
         _vp = vp;
-        _vp.PlatformUserData = (IntPtr)_gcHandle;
+        _vp.PlatformUserData = ((IntPtr)_gcHandle).ToPointer();
         _window = gw;
-        _vp.RendererUserData = (IntPtr)mainSubViewport.Id;
+        _vp.RendererUserData = ((IntPtr)mainSubViewport.Id).ToPointer();
     }
 
     public void Dispose()
@@ -152,6 +152,7 @@ internal static class ViewportsExts
     }
 }
 
+[SuppressMessage("Roslynator", "RCS0056:A line is too long")]
 internal sealed partial class Viewports
 {
     [LibraryImport("cimgui")]
@@ -212,21 +213,13 @@ internal sealed partial class Viewports
 
     private GodotImGuiWindow _mainWindow = null!;
 
-    private static void UpdateMonitors()
+    private static unsafe void UpdateMonitors()
     {
         var pio = ImGui.GetPlatformIO();
         int screenCount = DisplayServer.GetScreenCount();
 
-        // workaround for lack of ImVector constructor
-        unsafe
-        {
-            int bytes = screenCount * sizeof(ImGuiPlatformMonitor);
-            if (pio.NativePtr->Monitors.Data != IntPtr.Zero)
-                ImGui.MemFree(pio.NativePtr->Monitors.Data);
-            *&pio.NativePtr->Monitors.Data = ImGui.MemAlloc((uint)bytes);
-            *&pio.NativePtr->Monitors.Capacity = screenCount;
-            *&pio.NativePtr->Monitors.Size = screenCount;
-        }
+        int bytes = screenCount * sizeof(ImGuiPlatformMonitor);
+        pio.Monitors = new ImVector<ImGuiPlatformMonitor>(screenCount, screenCount, (ImGuiPlatformMonitor*)ImGui.MemAlloc((uint)bytes));
 
         for (int i = 0; i < screenCount; ++i)
         {
@@ -245,27 +238,22 @@ internal sealed partial class Viewports
 
     private static unsafe void InitPlatformInterface()
     {
-        var pio = ImGui.GetPlatformIO().NativePtr;
+        var pio = ImGui.GetPlatformIO();
 
-        pio->Platform_CreateWindow = Marshal.GetFunctionPointerForDelegate(_createWindow);
-        pio->Platform_DestroyWindow = Marshal.GetFunctionPointerForDelegate(_destroyWindow);
-        pio->Platform_ShowWindow = Marshal.GetFunctionPointerForDelegate(_showWindow);
-        pio->Platform_SetWindowPos = Marshal.GetFunctionPointerForDelegate(_setWindowPos);
+        pio.PlatformCreateWindow = Marshal.GetFunctionPointerForDelegate(_createWindow).ToPointer();
+        pio.PlatformDestroyWindow = Marshal.GetFunctionPointerForDelegate(_destroyWindow).ToPointer();
+        pio.PlatformShowWindow = Marshal.GetFunctionPointerForDelegate(_showWindow).ToPointer();
+        pio.PlatformSetWindowPos = Marshal.GetFunctionPointerForDelegate(_setWindowPos).ToPointer();
         //pio->Platform_GetWindowPos = Marshal.GetFunctionPointerForDelegate(_getWindowPos);
-        pio->Platform_SetWindowSize = Marshal.GetFunctionPointerForDelegate(_setWindowSize);
+        pio.PlatformSetWindowSize = Marshal.GetFunctionPointerForDelegate(_setWindowSize).ToPointer();
         //pio->Platform_GetWindowSize = Marshal.GetFunctionPointerForDelegate(_getWindowSize);
-        pio->Platform_SetWindowFocus = Marshal.GetFunctionPointerForDelegate(_setWindowFocus);
-        pio->Platform_GetWindowFocus = Marshal.GetFunctionPointerForDelegate(_getWindowFocus);
-        pio->Platform_GetWindowMinimized = Marshal.GetFunctionPointerForDelegate(
-            _getWindowMinimized);
-        pio->Platform_SetWindowTitle = Marshal.GetFunctionPointerForDelegate(_setWindowTitle);
+        pio.PlatformSetWindowFocus = Marshal.GetFunctionPointerForDelegate(_setWindowFocus).ToPointer();
+        pio.PlatformGetWindowFocus = Marshal.GetFunctionPointerForDelegate(_getWindowFocus).ToPointer();
+        pio.PlatformGetWindowMinimized = Marshal.GetFunctionPointerForDelegate(_getWindowMinimized).ToPointer();
+        pio.PlatformSetWindowTitle = Marshal.GetFunctionPointerForDelegate(_setWindowTitle).ToPointer();
 
-        ImGuiPlatformIO_Set_Platform_GetWindowPos(
-            pio,
-            Marshal.GetFunctionPointerForDelegate(_getWindowPos));
-        ImGuiPlatformIO_Set_Platform_GetWindowSize(
-            pio,
-            Marshal.GetFunctionPointerForDelegate(_getWindowSize));
+        ImGuiPlatformIO_Set_Platform_GetWindowPos(pio, Marshal.GetFunctionPointerForDelegate(_getWindowPos));
+        ImGuiPlatformIO_Set_Platform_GetWindowSize(pio, Marshal.GetFunctionPointerForDelegate(_getWindowSize));
     }
 
     public Viewports()
@@ -285,68 +273,67 @@ internal sealed partial class Viewports
         _ = new GodotImGuiWindow(vp);
     }
 
-    private static void Godot_DestroyWindow(ImGuiViewportPtr vp)
+    private static unsafe void Godot_DestroyWindow(ImGuiViewportPtr vp)
     {
-        if (vp.PlatformUserData != IntPtr.Zero)
+        if ((IntPtr)vp.PlatformUserData != IntPtr.Zero)
         {
-            var window = (GodotImGuiWindow)GCHandle.FromIntPtr(vp.PlatformUserData).Target!;
+            var window = (GodotImGuiWindow)GCHandle.FromIntPtr((IntPtr)vp.PlatformUserData).Target!;
             window.Dispose();
-            vp.PlatformUserData = IntPtr.Zero;
+            vp.PlatformUserData = (IntPtr.Zero).ToPointer();
         }
     }
 
-    private static void Godot_ShowWindow(ImGuiViewportPtr vp)
+    private static unsafe void Godot_ShowWindow(ImGuiViewportPtr vp)
     {
-        var window = (GodotImGuiWindow)GCHandle.FromIntPtr(vp.PlatformUserData).Target!;
+        var window = (GodotImGuiWindow)GCHandle.FromIntPtr((IntPtr)vp.PlatformUserData).Target!;
         window.ShowWindow();
     }
 
-    private static void Godot_SetWindowPos(ImGuiViewportPtr vp, Vector2 pos)
+    private static unsafe void Godot_SetWindowPos(ImGuiViewportPtr vp, Vector2 pos)
     {
-        var window = (GodotImGuiWindow)GCHandle.FromIntPtr(vp.PlatformUserData).Target!;
+        var window = (GodotImGuiWindow)GCHandle.FromIntPtr((IntPtr)vp.PlatformUserData).Target!;
         window.SetWindowPos(pos.ToVector2I());
     }
 
-    private static void Godot_GetWindowPos(ImGuiViewportPtr vp, out Vector2 pos)
+    private static unsafe void Godot_GetWindowPos(ImGuiViewportPtr vp, out Vector2 pos)
     {
-        var window = (GodotImGuiWindow)GCHandle.FromIntPtr(vp.PlatformUserData).Target!;
+        var window = (GodotImGuiWindow)GCHandle.FromIntPtr((IntPtr)vp.PlatformUserData).Target!;
         pos = window.GetWindowPos().ToImVec2();
     }
 
-    private static void Godot_SetWindowSize(ImGuiViewportPtr vp, Vector2 size)
+    private static unsafe void Godot_SetWindowSize(ImGuiViewportPtr vp, Vector2 size)
     {
-        var window = (GodotImGuiWindow)GCHandle.FromIntPtr(vp.PlatformUserData).Target!;
+        var window = (GodotImGuiWindow)GCHandle.FromIntPtr((IntPtr)vp.PlatformUserData).Target!;
         window.SetWindowSize(size.ToVector2I());
     }
 
-    private static void Godot_GetWindowSize(ImGuiViewportPtr vp, out Vector2 size)
+    private static unsafe void Godot_GetWindowSize(ImGuiViewportPtr vp, out Vector2 size)
     {
-        var window = (GodotImGuiWindow)GCHandle.FromIntPtr(vp.PlatformUserData).Target!;
+        var window = (GodotImGuiWindow)GCHandle.FromIntPtr((IntPtr)vp.PlatformUserData).Target!;
         size = window.GetWindowSize().ToImVec2();
     }
 
-    private static void Godot_SetWindowFocus(ImGuiViewportPtr vp)
+    private static unsafe void Godot_SetWindowFocus(ImGuiViewportPtr vp)
     {
-        var window = (GodotImGuiWindow)GCHandle.FromIntPtr(vp.PlatformUserData).Target!;
+        var window = (GodotImGuiWindow)GCHandle.FromIntPtr((IntPtr)vp.PlatformUserData).Target!;
         window.SetWindowFocus();
     }
 
-    private static bool Godot_GetWindowFocus(ImGuiViewportPtr vp)
+    private static unsafe bool Godot_GetWindowFocus(ImGuiViewportPtr vp)
     {
-        var window = (GodotImGuiWindow)GCHandle.FromIntPtr(vp.PlatformUserData).Target!;
+        var window = (GodotImGuiWindow)GCHandle.FromIntPtr((IntPtr)vp.PlatformUserData).Target!;
         return window.GetWindowFocus();
     }
 
-    private static bool Godot_GetWindowMinimized(ImGuiViewportPtr vp)
+    private static unsafe bool Godot_GetWindowMinimized(ImGuiViewportPtr vp)
     {
-        var window = (GodotImGuiWindow)GCHandle.FromIntPtr(vp.PlatformUserData).Target!;
+        var window = (GodotImGuiWindow)GCHandle.FromIntPtr((IntPtr)vp.PlatformUserData).Target!;
         return window.GetWindowMinimized();
     }
 
-    private static void Godot_SetWindowTitle(ImGuiViewportPtr vp, string title)
+    private static unsafe void Godot_SetWindowTitle(ImGuiViewportPtr vp, string title)
     {
-        var window = (GodotImGuiWindow)GCHandle.FromIntPtr(vp.PlatformUserData).Target!;
+        var window = (GodotImGuiWindow)GCHandle.FromIntPtr((IntPtr)vp.PlatformUserData).Target!;
         window.SetWindowTitle(title);
     }
 }
-#endif
